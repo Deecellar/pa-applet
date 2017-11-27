@@ -25,16 +25,23 @@ static gboolean subscribed = FALSE;
 static gboolean have_default_card_index = FALSE;
 static uint32_t default_card_index;
 static uint32_t default_sink_index;
+static uint32_t default_source_index;
 static unsigned int default_sink_num_channels;
+static unsigned int default_source_num_channels;
 
 static pa_operation *sink_reload_operation = NULL;
 static guint postponed_sink_reload_timeout_id;
 static gboolean has_postponed_sink_reload = FALSE;
 
+static pa_operation *source_reload_operation = NULL;
+static guint postponed_source_reload_timeout_id;
+static gboolean has_postponed_source_reload = FALSE;
+
 static gboolean try_connect(gpointer data);
 static void server_info_cb(pa_context *c, const pa_server_info *info, void *data);
 static void card_info_cb(pa_context *c, const pa_card_info *info, int eol, void *data);
 static void sink_info_cb(pa_context *c, const pa_sink_info *info, int eol, void *data);
+static void source_info_cb(pa_context *c, const pa_source_info *info, int eol, void *data);
 
 void pulse_glue_init(void)
 {
@@ -48,8 +55,12 @@ void pulse_glue_destroy(void)
 {
     if (has_postponed_sink_reload)
         g_source_remove(postponed_sink_reload_timeout_id);
+    if (has_postponed_source_reload)
+        g_source_remove(postponed_source_reload_timeout_id);
     if (sink_reload_operation)
         pa_operation_unref(sink_reload_operation);
+    if (source_reload_operation)
+        pa_operation_unref(source_reload_operation);
     if (context)
         pa_context_unref(context);
     pa_glib_mainloop_free(loop);
@@ -73,6 +84,24 @@ static gboolean postponed_sink_reload(gpointer data)
     return FALSE;
 }
 
+static gboolean postponed_source_reload(gpointer data)
+{
+    // Try again later if another source reload operation is in progress
+    if (source_reload_operation)
+        return TRUE;
+
+    // Start a source reload operation
+    source_reload_operation = pa_context_get_source_info_by_index(context,
+            default_source_index, source_info_cb, NULL);
+    if (!source_reload_operation)
+        g_printerr("pa_context_get_source_info_by_index() failed\n");
+
+    // We no longer have a postponed source reload operation
+    has_postponed_source_reload = FALSE;
+
+    return FALSE;
+}
+
 static void run_or_postpone_sink_reload(void)
 {
     // Postpone if a sink reload operation is in progress, do it
@@ -85,6 +114,22 @@ static void run_or_postpone_sink_reload(void)
     }
     else {
         postponed_sink_reload(NULL);
+        return;
+    }
+}
+
+static void run_or_postpone_source_reload(void)
+{
+    // Postpone if a source reload operation is in progress, do it
+    // right away otherwise
+    if (source_reload_operation) {
+        if (has_postponed_source_reload)
+            g_source_remove(postponed_source_reload_timeout_id);
+        postponed_source_reload_timeout_id = g_timeout_add_seconds(1, postponed_source_reload, NULL);
+        has_postponed_source_reload = TRUE;
+    }
+    else {
+        postponed_source_reload(NULL);
         return;
     }
 }
@@ -121,6 +166,11 @@ static void event_cb(pa_context *c, pa_subscription_event_type_t type, uint32_t 
             // If this is the sink we're handling, try to reload the sink status
             if (idx == default_sink_index)
                 run_or_postpone_sink_reload();
+            break;
+        case PA_SUBSCRIPTION_EVENT_SOURCE:
+            // If this is the source we're handling, try to reload the source status
+            if (idx == default_source_index)
+                run_or_postpone_source_reload();
             break;
         default:
             g_debug("Unhandled subscribed event type");
@@ -220,6 +270,55 @@ static void sink_info_cb(pa_context *c, const pa_sink_info *info, int eol, void 
     }
 }
 
+static void source_info_cb(pa_context *c, const pa_source_info *info, int eol, void *data)
+{
+    // Check if this is the termination call
+    if (eol > 0)
+        return;
+
+    // Get rid of the reference to the operation
+    g_assert(source_reload_operation);
+    pa_operation_unref(source_reload_operation);
+    source_reload_operation = NULL;
+
+    // Handle errors
+    if (eol < 0 || !info) {
+        g_printerr("Source info callback failure\n");
+        return;
+    }
+
+    // Check if the default card changed and save it
+    gboolean default_card_changed = !have_default_card_index ||
+        default_card_index != info->card;
+    default_card_index = info->card;
+    have_default_card_index = TRUE;
+
+    // Save the default source and the number of volume channels
+    default_source_index = info->index;
+    default_source_num_channels = info->volume.channels;
+
+    // If we aren't subscribed yet, subscribe now
+    if (!subscribed) {
+        pa_context_set_subscribe_callback(context, event_cb, NULL);
+        pa_operation *oper = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SERVER |
+                PA_SUBSCRIPTION_MASK_CARD | PA_SUBSCRIPTION_MASK_SOURCE, NULL, NULL);
+        if (oper)
+            pa_operation_unref(oper);
+        else
+            g_printerr("pa_context_subscribe() failed\n");
+        subscribed = TRUE;
+    }
+
+    // Start getting information about the card if it changed
+    if (default_card_changed) {
+        pa_operation *oper = pa_context_get_card_info_by_index(context,
+                default_card_index, card_info_cb, NULL);
+        if (oper)
+            pa_operation_unref(oper);
+        else
+            g_printerr("pa_context_get_card_info_by_index() failed\n");
+    }
+}
 static void server_info_cb(pa_context *c, const pa_server_info *info, void *data)
 {
     // Handle errors
@@ -235,11 +334,24 @@ static void server_info_cb(pa_context *c, const pa_server_info *info, void *data
         return;
     }
 
+    // Check if we have sources at all
+    if (!info->default_source_name) {
+        g_printerr("No default source name (don't you have any sources?)\n");
+        gtk_main_quit();
+        return;
+    }
+
     // If we have a sync reload operation in progress, get rid of it
     if (has_postponed_sink_reload)
         g_source_remove(postponed_sink_reload_timeout_id);
     if (sink_reload_operation)
         pa_operation_cancel(sink_reload_operation);
+
+    // If we have a source reload operation in progress, get rid of it
+    if (has_postponed_source_reload)
+        g_source_remove(postponed_source_reload_timeout_id);
+    if (source_reload_operation)
+        pa_operation_cancel(source_reload_operation);
 
     // Get the default sink info
     sink_reload_operation = pa_context_get_sink_info_by_name(context,
@@ -247,6 +359,13 @@ static void server_info_cb(pa_context *c, const pa_server_info *info, void *data
     if (!sink_reload_operation)
         g_printerr("pa_context_get_sink_info_by_name() failed\n");
     run_or_postpone_sink_reload();
+
+    // Get the default source info
+    source_reload_operation = pa_context_get_source_info_by_name(context,
+            info->default_source_name, source_info_cb, NULL);
+    if (!source_reload_operation)
+        g_printerr("pa_context_get_source_info_by_name() failed\n");
+    run_or_postpone_source_reload();
 }
 
 static void context_state_cb(pa_context *c, void *data)
@@ -342,6 +461,21 @@ void pulse_glue_sync_muted(void)
         pa_operation_unref(oper);
     else
         g_printerr("pa_context_set_sink_mute_by_index() failed\n");
+}
+
+void pulse_glue_sync_mic_muted(void)
+{
+    // Nothing to do if we don't have a context
+    if (!context)
+        return;
+
+    // Set the mute switch
+    pa_operation *oper = pa_context_set_source_mute_by_index(context,
+            default_source_index, shared_audio_status()->mic_muted, NULL, NULL);
+    if (oper)
+        pa_operation_unref(oper);
+    else
+        g_printerr("pa_context_set_source_mute_by_index() failed\n");
 }
 
 void pulse_glue_sync_active_profile(void)

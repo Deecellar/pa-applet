@@ -17,6 +17,7 @@ void audio_status_init(void)
 {
     status.volume = 0.0;
     status.muted = TRUE;
+    status.mic_muted = TRUE;
 }
 
 void audio_status_destroy(void)
@@ -54,6 +55,11 @@ void audio_status_lower_volume(void)
 void audio_status_toggle_muted(void)
 {
     status.muted = !status.muted;
+}
+
+void mic_status_toggle_muted(void)
+{
+    status.mic_muted = !status.mic_muted;
 }
 
 void audio_status_reset_profiles(void)

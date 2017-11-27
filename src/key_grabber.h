@@ -17,5 +17,6 @@ void key_grabber_ungrab_keys(void);
 void key_grabber_register_volume_raise_callback(key_grabber_cb cb);
 void key_grabber_register_volume_lower_callback(key_grabber_cb cb);
 void key_grabber_register_volume_mute_callback(key_grabber_cb cb);
+void key_grabber_register_mic_mute_callback(key_grabber_cb cb);
 
 #endif
