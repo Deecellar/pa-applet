@@ -159,7 +159,7 @@ static void event_cb(pa_context *c, pa_subscription_event_type_t type, uint32_t 
                 if (oper)
                     pa_operation_unref(oper);
                 else
-                    g_printerr("pa_context_get_card_info_by_index() failed\n");
+                    g_printerr("pa_context_get_card_info_by_index() in event_cb failed\n");
             }
             break;
         case PA_SUBSCRIPTION_EVENT_SINK:
@@ -266,7 +266,7 @@ static void sink_info_cb(pa_context *c, const pa_sink_info *info, int eol, void 
         if (oper)
             pa_operation_unref(oper);
         else
-            g_printerr("pa_context_get_card_info_by_index() failed\n");
+            g_printerr("pa_context_get_card_info_by_index() in sink_info_cb failed\n");
     }
 }
 
@@ -316,7 +316,7 @@ static void source_info_cb(pa_context *c, const pa_source_info *info, int eol, v
         if (oper)
             pa_operation_unref(oper);
         else
-            g_printerr("pa_context_get_card_info_by_index() failed\n");
+            g_printerr("pa_context_get_card_info_by_index() in source_info_cb failed\n");
     }
 }
 static void server_info_cb(pa_context *c, const pa_server_info *info, void *data)
