@@ -7,6 +7,9 @@
  *
  */
 
+#include "config.h"
+
+#ifdef HAVE_LIBNOTIFY
 #include <libnotify/notify.h>
 
 #include "audio_status.h"
@@ -15,9 +18,11 @@
 
 gboolean have_notifications = FALSE;
 NotifyNotification *notification = NULL;
+#endif
 
 void notifications_init(void)
 {
+#ifdef HAVE_LIBNOTIFY
     if (notify_init(PROGRAM_NAME)) {
         // Create and configure the notification
         have_notifications = TRUE;
@@ -37,19 +42,23 @@ void notifications_init(void)
     else {
         g_printerr("Failed to initialize notifications\n");
     }
+#endif
 }
 
 void notifications_destroy(void)
 {
+#ifdef HAVE_LIBNOTIFY
     if (have_notifications) {
         notify_uninit();
         if (notification)
             g_object_unref(G_OBJECT(notification));
     }
+#endif
 }
 
 void notifications_flash(void)
 {
+#ifdef HAVE_LIBNOTIFY
     // Nothing to do if we don't support notifications
     if (!have_notifications || !notification)
         return;
@@ -77,4 +86,5 @@ void notifications_flash(void)
 
     // Show the notification
     notify_notification_show(notification, NULL);
+#endif
 }
