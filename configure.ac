@@ -12,7 +12,8 @@ fi
 AC_HEADER_STDC
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
-PKG_CHECK_MODULES([GTK3], [gtk+-3.0])
+AC_ARG_ENABLE([gtk2], [AS_HELP_STRING([--enable-gtk2], use GTK+ 2)], [gtk=gtk+-2.0], [gtk=gtk+-3.0])
+PKG_CHECK_MODULES([GTK], [$gtk])
 PKG_CHECK_MODULES([LIBPULSE], [libpulse])
 PKG_CHECK_MODULES([LIBPULSE_GLIB], [libpulse-mainloop-glib])
 AC_ARG_WITH([libnotify], [AS_HELP_STRING([--without-libnotify], [disable notification support])], [], [with_libnotify=yes])

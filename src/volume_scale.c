@@ -42,7 +42,11 @@ static void create_volume_scale(void)
     gtk_window_set_default_size(GTK_WINDOW(window), 0, 120);
 
     // Create the scale and add it to the window
+#if GTK_CHECK_VERSION(3, 0, 0)
     scale = gtk_scale_new_with_range(GTK_ORIENTATION_VERTICAL, 0.0, 100.0, 1.0);
+#else
+    scale = gtk_vscale_new_with_range(0.0, 100.0, 1.0);
+#endif
     gtk_scale_set_draw_value(GTK_SCALE(scale), FALSE);
     gtk_range_set_inverted(GTK_RANGE(scale), TRUE);
     gtk_container_add(GTK_CONTAINER(window), scale);
@@ -108,9 +112,16 @@ static void do_show_volume_scale(GdkRectangle *rect_or_null)
 
 static void on_pointer_press(GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
+#if !GTK_CHECK_VERSION(3, 0, 0)
+    // Ungrab the pointer
+    gdk_pointer_ungrab(GDK_CURRENT_TIME);
+    gdk_flush();
+#endif
+
     // Hide the volume scale
     hide_volume_scale();
 
+#if GTK_CHECK_VERSION(3, 0, 0)
     // Find the pointer device, if possible
     GdkDevice *device = gtk_get_current_event_device();
     if (device && gdk_device_get_source(device) == GDK_SOURCE_KEYBOARD)
@@ -123,6 +134,7 @@ static void on_pointer_press(GtkWidget *widget, GdkEventButton *event, gpointer 
     // Ungrab it
     gdk_device_ungrab(device, GDK_CURRENT_TIME);
     gdk_flush();
+#endif
 }
 
 void show_volume_scale(GdkRectangle *rect_or_null)
@@ -130,6 +142,7 @@ void show_volume_scale(GdkRectangle *rect_or_null)
     // Actually show the volume scale
     do_show_volume_scale(rect_or_null);
 
+#if GTK_CHECK_VERSION(3, 0, 0)
     // Find the pointer device, if possible
     GdkDevice *device = gtk_get_current_event_device();
     if (device && gdk_device_get_source(device) == GDK_SOURCE_KEYBOARD)
@@ -138,11 +151,17 @@ void show_volume_scale(GdkRectangle *rect_or_null)
         g_printerr("Failed to find the pointer device\n");
         return;
     }
+#endif
 
     // Grab it so we can hide the scale when the user clicks outside it
     g_signal_connect_after(G_OBJECT(window), "button_press_event", G_CALLBACK(on_pointer_press), NULL);
+#if GTK_CHECK_VERSION(3, 0, 0)
     gdk_device_grab(device, gtk_widget_get_window(window), GDK_OWNERSHIP_NONE,
             TRUE, GDK_BUTTON_PRESS_MASK, NULL, GDK_CURRENT_TIME);
+#else
+    gdk_pointer_grab(gtk_widget_get_window(window), TRUE,
+            GDK_BUTTON_PRESS_MASK, NULL, NULL, GDK_CURRENT_TIME);
+#endif
     gdk_flush();
 }
 
