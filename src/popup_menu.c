@@ -12,6 +12,7 @@
 
 #include "audio_status.h"
 #include "pulse_glue.h"
+#include "config.h"
 
 static GSList *profile_names = NULL;
 
@@ -25,6 +26,11 @@ static void on_selection_done(GtkMenu *menu, gpointer data)
     // Get rid of the copied profile names
     g_slist_free_full(profile_names, (GDestroyNotify)g_free);
     profile_names = NULL;
+}
+
+static void on_mixer_activate(GtkMenuItem *item, gpointer data)
+{
+    g_spawn_command_line_async(MIXER, NULL);
 }
 
 static void on_item_activate(GtkMenuItem *item, gpointer data)
@@ -71,12 +77,19 @@ void show_popup_menu(GtkStatusIcon *status_icon)
 
     // Nothing to do if we have no entries
     audio_status *as = shared_audio_status();
-    if (!as->profiles)
-        return;
 
     // Create the menu
     GtkWidget *menu = gtk_menu_new();
     g_signal_connect(G_OBJECT(menu), "selection-done", G_CALLBACK(on_selection_done), NULL);
+
+    GtkWidget *mixer = gtk_image_menu_item_new_from_stock(GTK_STOCK_PREFERENCES, NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), mixer);
+    g_signal_connect(G_OBJECT(mixer), "activate", G_CALLBACK(on_mixer_activate), NULL);
+
+    if (as->profiles) {
+        GtkWidget *sep = gtk_separator_menu_item_new();
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), sep);
+    }
 
     for (GSList *entry = as->profiles; entry; entry = g_slist_next(entry)) {
         // Create the item
