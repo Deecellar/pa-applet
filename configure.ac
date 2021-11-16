@@ -12,10 +12,14 @@ fi
 AC_HEADER_STDC
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
-PKG_CHECK_MODULES([GTK3], [gtk+-3.0])
+AC_ARG_ENABLE([gtk2], [AS_HELP_STRING([--enable-gtk2], use GTK+ 2)], [gtk=gtk+-2.0], [gtk=gtk+-3.0])
+PKG_CHECK_MODULES([GTK], [$gtk])
 PKG_CHECK_MODULES([LIBPULSE], [libpulse])
 PKG_CHECK_MODULES([LIBPULSE_GLIB], [libpulse-mainloop-glib])
-PKG_CHECK_MODULES([LIBNOTIFY], [libnotify])
+AC_ARG_WITH([libnotify], [AS_HELP_STRING([--without-libnotify], [disable notification support])], [], [with_libnotify=yes])
+AS_IF([test "x$with_libnotify" == xyes], [PKG_CHECK_MODULES([LIBNOTIFY], [libnotify], [AC_DEFINE(HAVE_LIBNOTIFY, [], [Notification support])])])
+AC_ARG_WITH([mixer], [AS_HELP_STRING([--with-mixer=pavucontrol], [Mixer application])], [with_mixer=$withval], [with_mixer=pavucontrol])
+AC_DEFINE_UNQUOTED([MIXER], ["$with_mixer"], [Mixer application])
 PKG_CHECK_MODULES([XLIB], [x11])
 
 AC_CONFIG_FILES([Makefile man/Makefile src/Makefile])

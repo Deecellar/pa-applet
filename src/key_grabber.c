@@ -13,22 +13,25 @@
 
 #include "key_grabber.h"
 
-#define NUM_KEYS_TO_GRAB 3
+#define NUM_KEYS_TO_GRAB 4
 
 static key_grabber_cb volume_raise_cb = NULL;
 static key_grabber_cb volume_lower_cb = NULL;
 static key_grabber_cb volume_mute_cb = NULL;
+static key_grabber_cb mic_mute_cb = NULL;
 
 static key_grabber_cb *grabbers[NUM_KEYS_TO_GRAB] = {
     &volume_raise_cb,
     &volume_lower_cb,
-    &volume_mute_cb
+    &volume_mute_cb,
+    &mic_mute_cb
 };
 
 static const char *keysym_names[NUM_KEYS_TO_GRAB] = {
     "XF86AudioRaiseVolume",
     "XF86AudioLowerVolume",
-    "XF86AudioMute"
+    "XF86AudioMute",
+    "XF86AudioMicMute"
 };
 
 static KeyCode grabbed_keys[NUM_KEYS_TO_GRAB] = { 0, };
@@ -179,4 +182,9 @@ void key_grabber_register_volume_lower_callback(key_grabber_cb cb)
 void key_grabber_register_volume_mute_callback(key_grabber_cb cb)
 {
     volume_mute_cb = cb;
+}
+
+void key_grabber_register_mic_mute_callback(key_grabber_cb cb)
+{
+    mic_mute_cb = cb;
 }

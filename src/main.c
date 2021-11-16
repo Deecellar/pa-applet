@@ -41,6 +41,12 @@ static void volume_mute_key_pressed(void)
     notifications_flash();
 }
 
+static void mic_mute_key_pressed(void)
+{
+    mic_status_toggle_muted();
+    pulse_glue_sync_mic_muted();
+}
+
 static void print_usage(FILE *out)
 {
     fprintf(out, "\
@@ -98,6 +104,7 @@ int main(int argc, char **argv)
         key_grabber_register_volume_raise_callback(volume_raise_key_pressed);
         key_grabber_register_volume_lower_callback(volume_lower_key_pressed);
         key_grabber_register_volume_mute_callback(volume_mute_key_pressed);
+        key_grabber_register_mic_mute_callback(mic_mute_key_pressed);
         key_grabber_grab_keys();
     }
 

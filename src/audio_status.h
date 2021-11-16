@@ -16,6 +16,7 @@
 typedef struct {
     gdouble volume;
     gboolean muted;
+    gboolean mic_muted;
     GSList *profiles;
 } audio_status;
 
@@ -37,5 +38,6 @@ void audio_status_sort_profiles(void);
 void audio_status_raise_volume(void);
 void audio_status_lower_volume(void);
 void audio_status_toggle_muted(void);
+void mic_status_toggle_muted(void);
 
 #endif
